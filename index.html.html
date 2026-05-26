@@ -1,0 +1,393 @@
+
+<h2 class="sr-only">AWS Bedrock vs Google Vertex AI vs Azure OpenAI — LLM 비용 비교 바 차트 (모델 선택 가능)</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+body{font-family:var(--font-sans);font-size:13px;}
+.ctrl-area{padding:0.75rem 1rem 0.6rem;border-bottom:0.5px solid var(--color-border-tertiary);}
+.ctrl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.ctrl-item label{font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:3px;}
+.ctrl-row{display:flex;align-items:center;gap:6px;}
+.ctrl-row input[type=range]{flex:1;}
+.ctrl-val{font-size:12px;font-weight:500;min-width:52px;text-align:right;color:var(--color-text-primary);}
+.stats-row{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
+.stat-pill{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:3px 8px;font-size:11px;color:var(--color-text-secondary);}
+.stat-pill strong{color:var(--color-text-primary);font-weight:500;}
+.main-wrap{display:flex;gap:0;}
+.model-panel{width:220px;flex-shrink:0;border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;max-height:700px;}
+.panel-hdr{padding:7px 10px;border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between;gap:4px;flex-shrink:0;}
+.panel-hdr-label{font-size:11px;font-weight:500;color:var(--color-text-secondary);}
+.panel-actions{display:flex;gap:3px;}
+.pa-btn{font-size:10px;padding:2px 6px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;}
+.pa-btn:hover{background:var(--color-background-secondary);}
+.search-wrap{padding:5px 8px;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0;}
+.search-wrap input{width:100%;font-size:12px;padding:4px 7px;}
+.filter-tabs{display:flex;gap:0;border-bottom:0.5px solid var(--color-border-tertiary);flex-shrink:0;}
+.ft-btn{flex:1;font-size:10px;padding:5px 2px;border:none;background:transparent;color:var(--color-text-secondary);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap;}
+.ft-btn:hover{color:var(--color-text-primary);}
+.ft-btn.act-all{color:var(--color-text-primary);border-bottom-color:var(--color-text-primary);}
+.ft-btn.act-aws{color:#b84f00;border-bottom-color:#FF9900;}
+.ft-btn.act-gcp{color:#1a56cc;border-bottom-color:#4285F4;}
+.ft-btn.act-azr{color:#0050a0;border-bottom-color:#0078D4;}
+.model-list{overflow-y:auto;flex:1;padding:3px 0;}
+.prov-label{font-size:10px;font-weight:500;color:var(--color-text-secondary);padding:5px 10px 2px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;}
+.prov-toggle{font-size:9px;color:var(--color-text-secondary);cursor:pointer;padding:1px 5px;border-radius:3px;border:0.5px solid var(--color-border-tertiary);background:transparent;}
+.prov-toggle:hover{background:var(--color-background-secondary);}
+.model-row{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 8px;cursor:pointer;transition:background 0.1s;}
+.model-row:hover{background:var(--color-background-secondary);}
+.model-row input[type=checkbox]{width:12px;height:12px;cursor:pointer;flex-shrink:0;}
+.model-row .m-name{font-size:11px;color:var(--color-text-primary);line-height:1.3;}
+.model-row.dep-row .m-name{color:var(--color-text-secondary);}
+.plat-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.dot-aws{background:#FF9900;}.dot-gcp{background:#4285F4;}.dot-azr{background:#0078D4;}
+.no-results{font-size:12px;color:var(--color-text-secondary);padding:14px 12px;text-align:center;}
+.chart-panel{flex:1;min-width:0;display:flex;flex-direction:column;}
+.chart-topbar{display:flex;align-items:center;gap:6px;padding:6px 12px;border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-secondary);}
+.leg-sq{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.sort-label{margin-left:auto;font-size:11px;color:var(--color-text-secondary);}
+.sort-sel{font-size:11px;padding:3px 5px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer;}
+.chart-area{padding:6px 10px 10px;flex:1;}
+</style>
+
+<div class="ctrl-area">
+  <div class="ctrl-grid">
+    <div class="ctrl-item">
+      <label>입력 토큰 / 회</label>
+      <div class="ctrl-row">
+        <input type="range" id="r-in" min="100" max="20000" step="100" value="2000">
+        <span class="ctrl-val" id="v-in">2,000</span>
+      </div>
+    </div>
+    <div class="ctrl-item">
+      <label>출력 토큰 / 회</label>
+      <div class="ctrl-row">
+        <input type="range" id="r-out" min="50" max="5000" step="50" value="500">
+        <span class="ctrl-val" id="v-out">500</span>
+      </div>
+    </div>
+    <div class="ctrl-item">
+      <label>호출 횟수</label>
+      <div class="ctrl-row">
+        <input type="range" id="r-calls" min="10" max="10000" step="10" value="100">
+        <span class="ctrl-val" id="v-calls">100</span>
+      </div>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-pill">총 입력 <strong id="s-in">200,000</strong></div>
+    <div class="stat-pill">총 출력 <strong id="s-out">50,000</strong></div>
+    <div class="stat-pill">최저 <strong id="s-min">—</strong></div>
+    <div class="stat-pill">최고 <strong id="s-max">—</strong></div>
+    <div class="stat-pill">배율 <strong id="s-ratio">—</strong></div>
+    <div class="stat-pill">표시 <strong id="s-count">—</strong> 개</div>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div class="model-panel">
+    <div class="panel-hdr">
+      <span class="panel-hdr-label">모델 선택</span>
+      <div class="panel-actions">
+        <button class="pa-btn" onclick="selectAll()">전체</button>
+        <button class="pa-btn" onclick="clearAll()">해제</button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="search-input" placeholder="모델명 검색..." oninput="renderPanel()">
+    </div>
+    <div class="filter-tabs">
+      <button class="ft-btn act-all" id="ft-all" onclick="setPlatFilter('all')">전체</button>
+      <button class="ft-btn" id="ft-aws" onclick="setPlatFilter('aws')">AWS</button>
+      <button class="ft-btn" id="ft-gcp" onclick="setPlatFilter('gcp')">Vertex</button>
+      <button class="ft-btn" id="ft-azr" onclick="setPlatFilter('azr')">Azure</button>
+    </div>
+    <div class="model-list" id="model-list"></div>
+  </div>
+
+  <div class="chart-panel">
+    <div class="chart-topbar">
+      <span class="legend-item"><span class="leg-sq" style="background:#FF9900;"></span>AWS Bedrock</span>
+      <span class="legend-item"><span class="leg-sq" style="background:#4285F4;"></span>Vertex AI</span>
+      <span class="legend-item"><span class="leg-sq" style="background:#0078D4;"></span>Azure OpenAI</span>
+      <span class="legend-item"><span class="leg-sq" style="background:#ccc;opacity:.5;"></span>Deprecated</span>
+      <span class="sort-label">정렬</span>
+      <select class="sort-sel" id="sort-sel" onchange="rebuild()">
+        <option value="cost">비용순</option>
+        <option value="name">이름순</option>
+        <option value="plat">플랫폼순</option>
+      </select>
+    </div>
+    <div class="chart-area">
+      <div id="chart-wrap" style="position:relative;width:100%;height:400px;">
+        <canvas id="myChart" role="img" aria-label="LLM 모델별 비용 수평 바 차트 (AWS Bedrock, Vertex AI, Azure OpenAI)">모델별 API 비용 비교 — 3개 플랫폼</canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const MODELS = [
+  // ── AWS BEDROCK ─────────────────────────────────────────────────────
+  {p:'aws',prov:'Amazon',    name:'Nova Micro',                  in_:0.035, out:0.14  },
+  {p:'aws',prov:'Amazon',    name:'Nova Lite',                   in_:0.06,  out:0.24  },
+  {p:'aws',prov:'Amazon',    name:'Nova Pro',                    in_:0.80,  out:3.20  },
+  {p:'aws',prov:'Amazon',    name:'Nova Premier',                in_:2.50,  out:12.50 },
+  {p:'aws',prov:'Anthropic', name:'Claude 3 Haiku',              in_:0.25,  out:1.25  },
+  {p:'aws',prov:'Anthropic', name:'Claude 3.5 Haiku',            in_:0.80,  out:4.00  },
+  {p:'aws',prov:'Anthropic', name:'Claude Haiku 4.5',            in_:1.00,  out:5.00  },
+  {p:'aws',prov:'Anthropic', name:'Claude 3.5 Sonnet (Ext)',     in_:6.00,  out:30.00, dep:true},
+  {p:'aws',prov:'Anthropic', name:'Claude 3.7 Sonnet',           in_:3.00,  out:15.00 },
+  {p:'aws',prov:'Anthropic', name:'Claude Sonnet 4.5',           in_:3.00,  out:15.00 },
+  {p:'aws',prov:'Anthropic', name:'Claude Sonnet 4.6',           in_:3.00,  out:15.00 },
+  {p:'aws',prov:'Anthropic', name:'Claude Opus 4.5',             in_:5.00,  out:25.00 },
+  {p:'aws',prov:'Anthropic', name:'Claude Opus 4.6',             in_:15.00, out:75.00 },
+  {p:'aws',prov:'Meta',      name:'Llama 3.1 8B',                in_:0.22,  out:0.22  },
+  {p:'aws',prov:'Meta',      name:'Llama 4 Maverick',            in_:0.24,  out:0.97  },
+  {p:'aws',prov:'Meta',      name:'Llama 3.3 70B',               in_:0.72,  out:0.72  },
+  {p:'aws',prov:'Meta',      name:'Llama 3.1 70B',               in_:0.99,  out:0.99  },
+  {p:'aws',prov:'Meta',      name:'Llama 3.1 405B',              in_:5.32,  out:16.00 },
+  {p:'aws',prov:'Mistral',   name:'Voxtral Mini 1.0',            in_:0.04,  out:0.04  },
+  {p:'aws',prov:'Mistral',   name:'Ministral 3B',                in_:0.10,  out:0.10  },
+  {p:'aws',prov:'Mistral',   name:'Ministral 8B',                in_:0.15,  out:0.15  },
+  {p:'aws',prov:'Mistral',   name:'Voxtral Small 1.0',           in_:0.10,  out:0.30  },
+  {p:'aws',prov:'Mistral',   name:'Ministral 14B',               in_:0.20,  out:0.20  },
+  {p:'aws',prov:'Mistral',   name:'Devstral 2 135B',             in_:0.40,  out:2.00  },
+  {p:'aws',prov:'Mistral',   name:'Magistral Small 1.2',         in_:0.50,  out:1.50  },
+  {p:'aws',prov:'Mistral',   name:'Mistral Large 3',             in_:0.50,  out:1.50  },
+  {p:'aws',prov:'DeepSeek',  name:'DeepSeek V3.2',               in_:0.62,  out:1.85  },
+  {p:'aws',prov:'Google',    name:'Gemma 3 4B (Bedrock)',        in_:0.04,  out:0.08  },
+  {p:'aws',prov:'Google',    name:'Gemma 3 12B (Bedrock)',       in_:0.09,  out:0.29  },
+  {p:'aws',prov:'Google',    name:'Gemma 3 27B (Bedrock)',       in_:0.23,  out:0.38  },
+  {p:'aws',prov:'NVIDIA',    name:'Nemotron Nano 2',             in_:0.06,  out:0.23  },
+  {p:'aws',prov:'NVIDIA',    name:'Nemotron 3 Nano 30B',         in_:0.06,  out:0.24  },
+  {p:'aws',prov:'Qwen',      name:'Qwen3 32B',                   in_:0.15,  out:0.60  },
+  {p:'aws',prov:'Qwen',      name:'Qwen3 Coder Next',            in_:0.50,  out:1.20  },
+  {p:'aws',prov:'Z AI',      name:'GLM 4.7 Flash',               in_:0.07,  out:0.40  },
+  {p:'aws',prov:'Z AI',      name:'GLM 4.7',                     in_:0.60,  out:2.20  },
+  {p:'aws',prov:'MiniMax',   name:'MiniMax M2.1',                in_:0.30,  out:1.20  },
+  {p:'aws',prov:'Moonshot',  name:'Kimi K2 Thinking',            in_:0.60,  out:2.50  },
+  {p:'aws',prov:'Moonshot',  name:'Kimi K2.5',                   in_:0.60,  out:3.00  },
+  // ── VERTEX AI ───────────────────────────────────────────────────────
+  {p:'gcp',prov:'Google',    name:'Gemini 1.5 Flash',            in_:0.075, out:0.30,  dep:true},
+  {p:'gcp',prov:'Google',    name:'Gemini 2.0 Flash',            in_:0.10,  out:0.40,  dep:true},
+  {p:'gcp',prov:'Google',    name:'Gemini 1.5 Pro',              in_:1.25,  out:5.00,  dep:true},
+  {p:'gcp',prov:'Google',    name:'Gemini 2.5 Flash-Lite',       in_:0.10,  out:0.40  },
+  {p:'gcp',prov:'Google',    name:'Gemini 2.5 Flash',            in_:0.15,  out:0.60  },
+  {p:'gcp',prov:'Google',    name:'Gemini 3 Flash',              in_:0.50,  out:3.00  },
+  {p:'gcp',prov:'Google',    name:'Gemini 2.5 Pro',              in_:1.25,  out:10.00 },
+  {p:'gcp',prov:'Google',    name:'Gemini 3.1 Pro',              in_:2.00,  out:12.00 },
+  {p:'gcp',prov:'Anthropic', name:'Claude 3.5 Haiku (Vertex)',   in_:0.80,  out:4.00  },
+  {p:'gcp',prov:'Anthropic', name:'Claude 3.5 Sonnet v2 (Vtx)',  in_:3.00,  out:15.00 },
+  {p:'gcp',prov:'Anthropic', name:'Claude Sonnet 4.5 (Vertex)',  in_:3.00,  out:15.00 },
+  {p:'gcp',prov:'Anthropic', name:'Claude 3 Opus (Vertex)',      in_:15.00, out:75.00 },
+  {p:'gcp',prov:'Meta',      name:'Llama 3.3 8B (Vertex)',       in_:0.20,  out:0.20  },
+  {p:'gcp',prov:'Meta',      name:'Llama 4 Scout (Vertex)',      in_:0.25,  out:0.72  },
+  {p:'gcp',prov:'Meta',      name:'Llama 3.3 70B (Vertex)',      in_:0.68,  out:0.68  },
+  // ── AZURE OPENAI ────────────────────────────────────────────────────
+  // GPT-5 family (Global Standard, 2026-05)
+  {p:'azr',prov:'OpenAI',    name:'GPT-5-nano',                  in_:0.05,  out:0.40  },
+  {p:'azr',prov:'OpenAI',    name:'GPT-5-mini',                  in_:0.25,  out:2.00  },
+  {p:'azr',prov:'OpenAI',    name:'GPT-5',                       in_:1.25,  out:10.00 },
+  {p:'azr',prov:'OpenAI',    name:'GPT-5 Pro',                   in_:15.00, out:120.00},
+  // GPT-4.1 family
+  {p:'azr',prov:'OpenAI',    name:'GPT-4.1-nano',                in_:0.10,  out:0.40  },
+  {p:'azr',prov:'OpenAI',    name:'GPT-4.1-mini',                in_:0.40,  out:1.60  },
+  {p:'azr',prov:'OpenAI',    name:'GPT-4.1',                     in_:2.00,  out:8.00  },
+  // GPT-4o family
+  {p:'azr',prov:'OpenAI',    name:'GPT-4o-mini',                 in_:0.15,  out:0.60  },
+  {p:'azr',prov:'OpenAI',    name:'GPT-4o',                      in_:2.50,  out:10.00 },
+  // Reasoning (o-series)
+  {p:'azr',prov:'OpenAI',    name:'o3-mini',                     in_:1.10,  out:4.40  },
+  {p:'azr',prov:'OpenAI',    name:'o4-mini',                     in_:1.10,  out:4.40  },
+  {p:'azr',prov:'OpenAI',    name:'o3',                          in_:2.00,  out:8.00  },
+  // Legacy (dep)
+  {p:'azr',prov:'OpenAI',    name:'GPT-3.5 Turbo',               in_:0.50,  out:1.50,  dep:true},
+  {p:'azr',prov:'OpenAI',    name:'GPT-4 (32K)',                  in_:60.00, out:120.00,dep:true},
+];
+
+MODELS.forEach((m,i) => { m._id = i; });
+
+// Default: all non-deprecated selected
+const selected = new Set(MODELS.filter(m=>!m.dep).map(m=>m._id));
+
+let platFilter = 'all';
+let chart = null;
+
+const C = {aws:'#FF9900', gcp:'#4285F4', azr:'#0078D4'};
+const CD = {aws:'rgba(255,153,0,0.28)', gcp:'rgba(66,133,244,0.28)', azr:'rgba(0,120,212,0.28)'};
+
+function fmtCost(n){
+  if(n===0)return'$0';
+  if(n<0.001)return'$'+n.toFixed(5);
+  if(n<0.01)return'$'+n.toFixed(4);
+  if(n<1)return'$'+n.toFixed(4);
+  if(n<10)return'$'+n.toFixed(3);
+  return'$'+n.toFixed(2);
+}
+function calcCost(m,inT,outT,calls){
+  return(inT*calls/1e6)*m.in_+(outT*calls/1e6)*m.out;
+}
+
+function getPanelModels(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  return MODELS.filter(m=>{
+    if(platFilter!=='all'&&m.p!==platFilter)return false;
+    if(q&&!m.name.toLowerCase().includes(q)&&!m.prov.toLowerCase().includes(q))return false;
+    return true;
+  });
+}
+
+function renderPanel(){
+  const list=document.getElementById('model-list');
+  const filtered=getPanelModels();
+  const byProv={};
+  filtered.forEach(m=>{
+    const key=m.p+'|'+m.prov;
+    if(!byProv[key])byProv[key]={prov:m.prov,p:m.p,models:[]};
+    byProv[key].models.push(m);
+  });
+  if(filtered.length===0){list.innerHTML='<div class="no-results">검색 결과 없음</div>';return;}
+  let html='';
+  for(const key of Object.keys(byProv)){
+    const g=byProv[key];
+    const allChk=g.models.every(m=>selected.has(m._id));
+    const platLabel=g.p==='aws'?'AWS':g.p==='gcp'?'GCP':'Azure';
+    html+=`<div>
+      <div class="prov-label">
+        <span style="color:${C[g.p]}">${platLabel}</span>
+        <span style="color:var(--color-text-secondary);margin-left:2px">${g.prov}</span>
+        <button class="prov-toggle" onclick="toggleProv('${key}',${allChk})">${allChk?'해제':'선택'}</button>
+      </div>`;
+    for(const m of g.models){
+      const chk=selected.has(m._id)?'checked':'';
+      html+=`<div class="model-row${m.dep?' dep-row':''}" onclick="toggleModel(${m._id})">
+        <input type="checkbox" ${chk} onclick="event.stopPropagation();toggleModel(${m._id})" style="accent-color:${C[m.p]}">
+        <span class="plat-dot dot-${m.p}"></span>
+        <div class="m-name">${m.name}${m.dep?' <span style="font-size:9px;color:var(--color-text-secondary)">[dep]</span>':''}</div>
+      </div>`;
+    }
+    html+='</div>';
+  }
+  list.innerHTML=html;
+}
+
+function toggleModel(id){
+  if(selected.has(id))selected.delete(id);else selected.add(id);
+  renderPanel();rebuild();
+}
+function toggleProv(key,wasAll){
+  const ms=getPanelModels().filter(m=>m.p+'|'+m.prov===key);
+  ms.forEach(m=>{if(wasAll)selected.delete(m._id);else selected.add(m._id);});
+  renderPanel();rebuild();
+}
+function selectAll(){getPanelModels().forEach(m=>selected.add(m._id));renderPanel();rebuild();}
+function clearAll(){getPanelModels().forEach(m=>selected.delete(m._id));renderPanel();rebuild();}
+function setPlatFilter(mode){
+  platFilter=mode;
+  ['all','aws','gcp','azr'].forEach(k=>{
+    const el=document.getElementById('ft-'+k);
+    el.className='ft-btn';
+    if(k===mode)el.classList.add('act-'+k);
+  });
+  renderPanel();
+}
+
+function rebuild(){
+  const inT=+document.getElementById('r-in').value;
+  const outT=+document.getElementById('r-out').value;
+  const calls=+document.getElementById('r-calls').value;
+  const sortMode=document.getElementById('sort-sel').value;
+  document.getElementById('v-in').textContent=inT.toLocaleString();
+  document.getElementById('v-out').textContent=outT.toLocaleString();
+  document.getElementById('v-calls').textContent=calls.toLocaleString();
+  document.getElementById('s-in').textContent=(inT*calls).toLocaleString();
+  document.getElementById('s-out').textContent=(outT*calls).toLocaleString();
+
+  let data=MODELS.filter(m=>selected.has(m._id))
+    .map(m=>({...m,cost:calcCost(m,inT,outT,calls)}));
+  if(sortMode==='cost')data.sort((a,b)=>a.cost-b.cost);
+  else if(sortMode==='name')data.sort((a,b)=>a.name.localeCompare(b.name));
+  else data.sort((a,b)=>a.p.localeCompare(b.p)||a.cost-b.cost);
+
+  const costs=data.map(d=>d.cost);
+  const minC=costs.length?Math.min(...costs):0;
+  const maxC=costs.length?Math.max(...costs):0;
+  document.getElementById('s-min').textContent=costs.length?fmtCost(minC):'—';
+  document.getElementById('s-max').textContent=costs.length?fmtCost(maxC):'—';
+  document.getElementById('s-ratio').textContent=(costs.length&&minC>0)?Math.round(maxC/minC).toLocaleString()+'×':'—';
+  document.getElementById('s-count').textContent=data.length;
+
+  const BAR_H=26;
+  const chartH=Math.max(100,data.length*BAR_H+60);
+  document.getElementById('chart-wrap').style.height=chartH+'px';
+
+  const isDark=matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
+  const tickColor=isDark?'#8899aa':'#666';
+  const labelColor=isDark?'#c8d8e8':'#333';
+
+  if(chart){chart.destroy();chart=null;}
+  if(!data.length)return;
+
+  chart=new Chart(document.getElementById('myChart'),{
+    type:'bar',
+    data:{
+      labels:data.map(d=>d.name),
+      datasets:[{
+        label:'비용 (USD)',
+        data:data.map(d=>+d.cost.toFixed(6)),
+        backgroundColor:data.map(d=>d.dep?CD[d.p]:C[d.p]),
+        borderWidth:0,borderRadius:3,borderSkipped:false,
+      }]
+    },
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      animation:{duration:220},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label(ctx){
+              const m=data[ctx.dataIndex];
+              const plat=m.p==='aws'?'AWS Bedrock':m.p==='gcp'?'Vertex AI':'Azure OpenAI';
+              return[
+                ` 총 비용: ${fmtCost(ctx.parsed.x)}`,
+                ` 입력: $${m.in_.toFixed(m.in_<0.1?3:2)}/1M  출력: $${m.out.toFixed(m.out<0.1?3:2)}/1M`,
+                ` ${plat} · ${m.prov}`,
+              ];
+            },
+            title(items){return items[0].label;}
+          },
+          backgroundColor:isDark?'#1a2840':'#fff',
+          titleColor:isDark?'#e2e8f0':'#111',
+          bodyColor:isDark?'#8899aa':'#555',
+          borderColor:isDark?'#1e2f47':'#ddd',
+          borderWidth:1,padding:10,
+        }
+      },
+      scales:{
+        x:{
+          beginAtZero:true,
+          grid:{color:gridColor},
+          ticks:{color:tickColor,font:{size:11},callback(v){return fmtCost(v);},maxTicksLimit:7},
+          title:{display:true,text:'총 비용 (USD)',color:tickColor,font:{size:11}}
+        },
+        y:{
+          grid:{display:false},
+          ticks:{color:labelColor,font:{size:11},autoSkip:false}
+        }
+      },
+      layout:{padding:{top:4,right:18,bottom:4,left:4}}
+    }
+  });
+}
+
+document.getElementById('r-in').addEventListener('input',rebuild);
+document.getElementById('r-out').addEventListener('input',rebuild);
+document.getElementById('r-calls').addEventListener('input',rebuild);
+
+renderPanel();
+rebuild();
+</script>
